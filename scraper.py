@@ -9,8 +9,7 @@ import urllib2
 from datetime import datetime
 from bs4 import BeautifulSoup
 
-#### FUNCTIONS 1.2
-import requests       # import requests for validating urls
+#### FUNCTIONS 1.0
 
 def validateFilename(filename):
     filenameregex = '^[a-zA-Z0-9]+_[a-zA-Z0-9]+_[a-zA-Z0-9]+_[0-9][0-9][0-9][0-9]_[0-9QY][0-9]$'
@@ -38,23 +37,25 @@ def validateFilename(filename):
 
 def validateURL(url):
     try:
-        r = requests.get(url, allow_redirects=True, timeout=20)
+        r = urllib2.urlopen(url)
         count = 1
-        while r.status_code == 500 and count < 4:
+        while r.getcode() == 500 and count < 4:
             print ("Attempt {0} - Status code: {1}. Retrying.".format(count, r.status_code))
             count += 1
-            r = requests.get(url, allow_redirects=True, timeout=20)
+            r = urllib2.urlopen(url)
         sourceFilename = r.headers.get('Content-Disposition')
+
         if sourceFilename:
             ext = os.path.splitext(sourceFilename)[1].replace('"', '').replace(';', '').replace(' ', '')
         else:
             ext = os.path.splitext(url)[1]
-        validURL = r.status_code == 200
-        validFiletype = ext.lower() in ['.csv', '.xls', '.xlsx', '.pdf']
+        validURL = r.getcode() == 200
+        validFiletype = ext.lower() in ['.csv', '.xls', '.xlsx']
         return validURL, validFiletype
     except:
         print ("Error validating URL.")
         return False, False
+
 
 
 def validate(filename, file_url):
@@ -83,8 +84,8 @@ def convert_mth_strings ( mth_string ):
 
 #### VARIABLES 1.0
 
-entity_id = "FTRAJX_SUHNFT_gov"
-url = "http://www.southend.nhs.uk/about-us/trust-publications-and-reports/finance/"
+entity_id = "NFTRL4_TRWNT_gov"
+url = "https://data.gov.uk/dataset/financial-transactions-data-royal-wolverhampton-hospitals-nhs-trust"
 errors = 0
 data = []
 
@@ -94,18 +95,18 @@ data = []
 html = urllib2.urlopen(url)
 soup = BeautifulSoup(html, 'lxml')
 
+
 #### SCRAPE DATA
 
-blocks = soup.find('div', 'additional').find_all('a')
+blocks = soup.find_all('div', 'dataset-resource-text')
 for block in blocks:
-   if '.csv' in block['href'] or '.xls' in block['href'] or '.xlsx' in block['href'] or '.pdf' in block['href']:
-        url = 'http://www.southend.nhs.uk'+block['href']
-        title = block.text.strip().split()
-        csvMth = title[0][:3]
-        csvYr = title[1].strip()[:4]
+    title = block.find('span', 'inner-cell').text.strip().split()
+    url = block.find('div', 'inner-cell').find_all('span')[1].find('a')['href']
+    csvMth = title[2][:3]
+    csvYr = title[1]
+    csvMth = convert_mth_strings(csvMth.upper())
+    data.append([csvYr, csvMth, url])
 
-        csvMth = convert_mth_strings(csvMth.upper())
-        data.append([csvYr, csvMth, url])
 
 #### STORE DATA 1.0
 
