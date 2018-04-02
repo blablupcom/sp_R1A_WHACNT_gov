@@ -9,7 +9,8 @@ import urllib2
 from datetime import datetime
 from bs4 import BeautifulSoup
 
-#### FUNCTIONS 1.0
+#### FUNCTIONS 1.1
+import requests
 
 def validateFilename(filename):
     filenameregex = '^[a-zA-Z0-9]+_[a-zA-Z0-9]+_[a-zA-Z0-9]+_[0-9][0-9][0-9][0-9]_[0-9QY][0-9]$'
@@ -37,25 +38,24 @@ def validateFilename(filename):
 
 def validateURL(url):
     try:
-        r = urllib2.urlopen(url)
+        r = requests.get(url)
         count = 1
-        while r.getcode() == 500 and count < 4:
+        while r.status_code == 500 and count < 4:
             print ("Attempt {0} - Status code: {1}. Retrying.".format(count, r.status_code))
             count += 1
-            r = urllib2.urlopen(url)
+            r = requests.get(url)
         sourceFilename = r.headers.get('Content-Disposition')
 
         if sourceFilename:
             ext = os.path.splitext(sourceFilename)[1].replace('"', '').replace(';', '').replace(' ', '')
         else:
             ext = os.path.splitext(url)[1]
-        validURL = r.getcode() == 200
+        validURL = r.status_code == 200
         validFiletype = ext.lower() in ['.csv', '.xls', '.xlsx']
         return validURL, validFiletype
     except:
         print ("Error validating URL.")
         return False, False
-
 
 
 def validate(filename, file_url):
@@ -84,11 +84,10 @@ def convert_mth_strings ( mth_string ):
 
 #### VARIABLES 1.0
 
-entity_id = "NFTRL4_TRWNT_gov"
-url = "https://data.gov.uk/dataset/financial-transactions-data-royal-wolverhampton-hospitals-nhs-trust"
+entity_id = "R1A_WHACNT_gov"
+url = "http://www.hacw.nhs.uk/news/publication-of-expenditure-over-25-000/"
 errors = 0
 data = []
-
 
 #### READ HTML 1.0
 
@@ -97,15 +96,17 @@ soup = BeautifulSoup(html, 'lxml')
 
 
 #### SCRAPE DATA
-
-blocks = soup.find_all('div', 'dataset-resource-text')
+blocks = soup.find_all('div', 'ContentEditor')
 for block in blocks:
-    title = block.find('span', 'inner-cell').text.strip().split()
-    url = block.find('div', 'inner-cell').find_all('span')[1].find('a')['href']
-    csvMth = title[2][:3]
-    csvYr = title[1]
-    csvMth = convert_mth_strings(csvMth.upper())
-    data.append([csvYr, csvMth, url])
+    links = block.find_all('a')
+    for link in links:
+            title = link.text.strip()
+            if '20' in title:
+                url = 'http://www.hacw.nhs.uk'+link['href']
+                csvMth = title.split()[0].strip()[:3]
+                csvYr = title.split()[-1].strip()[:4]
+                csvMth = convert_mth_strings(csvMth.upper())
+                data.append([csvYr, csvMth, url])
 
 
 #### STORE DATA 1.0
